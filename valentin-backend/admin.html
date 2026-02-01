@@ -102,12 +102,30 @@
         </div>
 
         <!-- Liste des partenaires -->
-        <div class="card">
+        <div class="card mb-4">
             <div class="card-header bg-info text-white">
                 <h4>Partenaires disponibles</h4>
             </div>
             <div class="card-body">
                 <div id="partners-list"></div>
+            </div>
+        </div>
+
+        <!-- Génération des Couples -->
+        <div class="card mb-5 border-danger">
+            <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">❤️ Générateur de Couples ❤️</h4>
+            </div>
+            <div class="card-body text-center">
+                <p class="lead">Lancer l'algorithme pour former les couples parmi les utilisateurs inscrits.</p>
+                <button id="btn-match" class="btn btn-danger btn-lg pulse-button">
+                    💘 Former les Couples
+                </button>
+
+                <div id="matching-results" class="mt-4 text-start" style="display: none;">
+                    <h5 class="border-bottom pb-2 mb-3">Résultats du Matching</h5>
+                    <div id="couples-container" class="row g-3"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -197,6 +215,79 @@
                 alert('Erreur lors de l\'ajout');
             }
         });
+
+        // Initialisation
+        loadStats();
+        loadPartners();
+        // Générer les couples
+        document.getElementById('btn-match').addEventListener('click', async () => {
+            const btn = document.getElementById('btn-match');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Calcul en cours...';
+
+            try {
+                const response = await fetch(`${API_URL}/admin/match-all`, { method: 'POST' });
+                const result = await response.json();
+
+                if (result.error) {
+                    alert(result.error);
+                } else {
+                    displayCouples(result.groups, result.isThrouplePresent);
+                }
+            } catch (error) {
+                console.error('Erreur matching:', error);
+                alert('Erreur lors du matching');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '💘 Former les Couples';
+            }
+        });
+
+        function displayCouples(groups, isThrouple) {
+            const container = document.getElementById('couples-container');
+            const resultsDiv = document.getElementById('matching-results');
+
+            resultsDiv.style.display = 'block';
+            container.innerHTML = '';
+
+            if (isThrouple) {
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-warning col-12';
+                alertDiv.innerHTML = '⚠️ Nombre impair d\'utilisateurs : Un <strong>trio</strong> a été formé !';
+                container.appendChild(alertDiv);
+            }
+
+            groups.forEach((group, index) => {
+                const col = document.createElement('div');
+                col.className = group.length === 3 ? 'col-12' : 'col-md-6';
+
+                let cardsHtml = group.map(user => `
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${user.name}</strong>
+                            <br>
+                            <small class="text-muted">${user.age} ans - ${user.city}</small>
+                        </div>
+                        <span class="badge bg-secondary rounded-pill">ID: ${user.id}</span>
+                    </div>
+                `).join('');
+
+                col.innerHTML = `
+                    <div class="card h-100 ${group.length === 3 ? 'border-warning' : 'border-success'}">
+                        <div class="card-header ${group.length === 3 ? 'bg-warning' : 'bg-success'} text-white">
+                            ${group.length === 3 ? '🔥 Trio Amoureux' : `couple #${index + 1}`}
+                        </div>
+                        <ul class="list-group list-group-flush">
+                            ${cardsHtml}
+                        </ul>
+                    </div>
+                `;
+                container.appendChild(col);
+            });
+
+            // Scroll to results
+            resultsDiv.scrollIntoView({ behavior: 'smooth' });
+        }
 
         // Initialisation
         loadStats();

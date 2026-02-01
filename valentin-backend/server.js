@@ -9,6 +9,7 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(express.static(__dirname)); // Serve static files from root
 
 // Pool de connexions MySQL
 const pool = mysql.createPool({
@@ -23,6 +24,22 @@ const pool = mysql.createPool({
 });
 
 // Routes API
+
+// 0. Admin: Ajouter un partenaire
+app.post('/api/admin/partners', async (req, res) => {
+    try {
+        const { name, age, city, personality, hobbies, description, image_url } = req.body;
+
+        const [result] = await pool.query(
+            'INSERT INTO partners (name, age, city, personality, hobbies, description, image_url, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, TRUE)',
+            [name, age, city, personality.join(','), hobbies.join(','), description, image_url]
+        );
+
+        res.json({ success: true, id: result.insertId });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
 
 // 1. Route pour vérifier la connexion à la base de données
 app.get('/api/health', async (req, res) => {
@@ -42,14 +59,14 @@ app.get('/api/partners', async (req, res) => {
         const [rows] = await pool.query(
             'SELECT * FROM partners WHERE is_active = TRUE'
         );
-        
+
         // Transformer les données
         const partners = rows.map(partner => ({
             ...partner,
             hobbies: partner.hobbies ? partner.hobbies.split(',') : [],
             personality: partner.personality ? partner.personality.split(',') : []
         }));
-        
+
         res.json(partners);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -60,16 +77,16 @@ app.get('/api/partners', async (req, res) => {
 app.post('/api/users', async (req, res) => {
     try {
         const { name, age, city, personalityTraits, selectedHobbies, description, email, password } = req.body;
-        
+
         const [result] = await pool.query(
             'INSERT INTO users (name, age, city, personality_traits, hobbies, description, email, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
             [name, age, city, personalityTraits.join(','), selectedHobbies.join(','), description, email, password]
         );
-        
-        res.json({ 
-            success: true, 
+
+        res.json({
+            success: true,
             userId: result.insertId,
-            message: 'Utilisateur créé avec succès' 
+            message: 'Utilisateur créé avec succès'
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -80,51 +97,51 @@ app.post('/api/users', async (req, res) => {
 app.post('/api/calculate-compatibility', async (req, res) => {
     try {
         const { userId, userData } = req.body;
-        
+
         // Récupérer tous les partenaires
         const [partnersRows] = await pool.query(
             'SELECT * FROM partners WHERE is_active = TRUE'
         );
-        
+
         // Calculer la compatibilité pour chaque partenaire
         const partnersWithCompatibility = partnersRows.map(partner => {
             let score = 50;
-            
+
             // Compatibilité d'âge
             if (userData.age && partner.age) {
                 const ageDiff = Math.abs(userData.age - partner.age);
                 if (ageDiff <= 5) score += 15;
                 else if (ageDiff <= 10) score += 5;
             }
-            
+
             // Ville
-            if (userData.city && partner.city && 
+            if (userData.city && partner.city &&
                 userData.city.toLowerCase() === partner.city.toLowerCase()) {
                 score += 20;
             }
-            
+
             // Hobbies communs
             const partnerHobbies = partner.hobbies ? partner.hobbies.split(',') : [];
-            const commonHobbies = userData.selectedHobbies?.filter(hobby => 
+            const commonHobbies = userData.selectedHobbies?.filter(hobby =>
                 partnerHobbies.includes(hobby)
             ).length || 0;
             score += commonHobbies * 5;
-            
+
             // Traits de personnalité communs
             const partnerPersonality = partner.personality ? partner.personality.split(',') : [];
-            const commonTraits = userData.selectedTraits?.filter(trait => 
+            const commonTraits = userData.selectedTraits?.filter(trait =>
                 partnerPersonality.includes(trait)
             ).length || 0;
             score += commonTraits * 3;
-            
+
             const finalScore = Math.min(score, 100);
-            
+
             // Enregistrer le match dans la base de données
             pool.query(
                 'INSERT INTO matches (user_id, partner_id, compatibility_score) VALUES (?, ?, ?)',
                 [userId, partner.id, finalScore]
             ).catch(console.error);
-            
+
             return {
                 ...partner,
                 hobbies: partnerHobbies,
@@ -132,10 +149,10 @@ app.post('/api/calculate-compatibility', async (req, res) => {
                 compatibilityScore: finalScore
             };
         });
-        
+
         // Trier par compatibilité
         partnersWithCompatibility.sort((a, b) => b.compatibilityScore - a.compatibilityScore);
-        
+
         res.json(partnersWithCompatibility);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -146,16 +163,16 @@ app.post('/api/calculate-compatibility', async (req, res) => {
 app.post('/api/messages', async (req, res) => {
     try {
         const { matchId, senderId, content } = req.body;
-        
+
         const [result] = await pool.query(
             'INSERT INTO messages (match_id, sender_id, content) VALUES (?, ?, ?)',
             [matchId, senderId, content]
         );
-        
-        res.json({ 
-            success: true, 
+
+        res.json({
+            success: true,
             messageId: result.insertId,
-            message: 'Message envoyé avec succès' 
+            message: 'Message envoyé avec succès'
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -166,12 +183,12 @@ app.post('/api/messages', async (req, res) => {
 app.get('/api/messages/:matchId', async (req, res) => {
     try {
         const { matchId } = req.params;
-        
+
         const [rows] = await pool.query(
             'SELECT * FROM messages WHERE match_id = ? ORDER BY created_at ASC',
             [matchId]
         );
-        
+
         res.json(rows);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -182,7 +199,7 @@ app.get('/api/messages/:matchId', async (req, res) => {
 app.get('/api/users/:userId/matches', async (req, res) => {
     try {
         const { userId } = req.params;
-        
+
         const [rows] = await pool.query(`
             SELECT m.*, p.name as partner_name, p.image_url 
             FROM matches m
@@ -190,8 +207,61 @@ app.get('/api/users/:userId/matches', async (req, res) => {
             WHERE m.user_id = ?
             ORDER BY m.compatibility_score DESC
         `, [userId]);
-        
+
         res.json(rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 8. Admin: Générer les couples (Match All)
+app.post('/api/admin/match-all', async (req, res) => {
+    try {
+        // 1. Récupérer tous les utilisateurs
+        const [users] = await pool.query('SELECT * FROM users');
+
+        if (users.length < 2) {
+            return res.status(400).json({
+                error: 'Pas assez d\'utilisateurs pour former des couples.'
+            });
+        }
+
+        // 2. Mélanger les utilisateurs (Algorithme de Fisher-Yates)
+        for (let i = users.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [users[i], users[j]] = [users[j], users[i]];
+        }
+
+        // 3. Former les groupes
+        const groups = [];
+
+        // Si nombre impair, on réserve les 3 derniers pour un trio
+        // Sinon on fait juste des paires
+        const isOdd = users.length % 2 !== 0;
+        const limit = isOdd ? users.length - 3 : users.length;
+
+        // Créer les paires
+        for (let i = 0; i < limit; i += 2) {
+            groups.push([users[i], users[i + 1]]);
+        }
+
+        // Mettre les 3 derniers ensemble si impair
+        if (isOdd) {
+            groups.push([
+                users[users.length - 3],
+                users[users.length - 2],
+                users[users.length - 1]
+            ]);
+        }
+
+        res.json({
+            success: true,
+            totalUsers: users.length,
+            totalGroups: groups.length,
+            groups: groups,
+            isThrouplePresent: isOdd // Indique si un trio a été formé
+        });
+
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

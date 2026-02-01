@@ -11,10 +11,6 @@ const Results = ({ userData }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    fetchPartners();
-  }, [fetchPartners]);
-
   const fetchPartners = React.useCallback(async () => {
     try {
       setLoading(true);
@@ -35,6 +31,10 @@ const Results = ({ userData }) => {
       setLoading(false);
     }
   }, [userData]);
+
+  useEffect(() => {
+    fetchPartners();
+  }, [fetchPartners]);
 
   const filteredPartners = partners
     .filter((partner) => {

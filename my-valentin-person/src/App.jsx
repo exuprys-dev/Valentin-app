@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 import PersonalityForm from './components/PersonalityForm';
+import SimpleRegister from './components/SimpleRegister';
 import Results from './components/Results';
 import { apiService } from './services/api';
 
@@ -8,6 +9,7 @@ function App() {
   const [userData, setUserData] = useState(null);
   const [showResults, setShowResults] = useState(false);
   const [apiStatus, setApiStatus] = useState('loading');
+  const [showFullRegistration, setShowFullRegistration] = useState(false);
 
   const checkApiHealth = async () => {
     try {
@@ -35,6 +37,7 @@ function App() {
   const handleReset = () => {
     setUserData(null);
     setShowResults(false);
+    setShowFullRegistration(false);
   };
 
   return (
@@ -65,7 +68,22 @@ function App() {
       <main className="py-5">
         <div className="container">
           {!showResults ? (
-            <PersonalityForm onSubmit={handleFormSubmit} />
+            showFullRegistration ? (
+              <div className="position-relative">
+                <button
+                  className="btn btn-outline-secondary mb-3"
+                  onClick={() => setShowFullRegistration(false)}
+                >
+                  &larr; Retour à l'inscription simple
+                </button>
+                <PersonalityForm onSubmit={handleFormSubmit} />
+              </div>
+            ) : (
+              <SimpleRegister
+                onSubmit={handleFormSubmit}
+                onSwitchToFull={() => setShowFullRegistration(true)}
+              />
+            )
           ) : (
             <>
               <div className="text-center mb-4">
